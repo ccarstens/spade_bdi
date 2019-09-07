@@ -68,10 +68,13 @@ class BDIAgent(Agent):
     class BDIBehaviour(CyclicBehaviour):
         def __init__(self):
             super().__init__()
+
+        def setup(self):
+            """should be called AFTER the behaviour was added to an agent
+                because otherwise the behaviour doesnt have an agent property"""
             self.add_actions()
             self.add_custom_actions()
             self.agent.load_asl()
-
 
         def add_actions(self):
             @self.agent.bdi_actions.add(".send", 3)
@@ -224,6 +227,20 @@ class BDIAgent(Agent):
                     self.agent.bdi_agent.step()
             else:
                 await asyncio.sleep(0.1)
+
+        def add_goal(self, functor: str, *args):
+            goal_type = asp.GoalType.achievement
+            trigger = asp.Trigger.addition
+
+            intention = asp.runtime.Intention()
+
+            goal = asp.Literal(functor, args)
+
+            goal = asp.freeze(goal, intention.scope, {})
+
+
+            tagged_goal = goal.with_annotation(asp.Literal("source", (asp.Literal("user_added"),)))
+            self.agent.bdi_intention_buffer.append((trigger, goal_type, tagged_goal, intention))
 
 
 def parse_literal(msg):
