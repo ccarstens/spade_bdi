@@ -42,7 +42,7 @@ class BDIAgent(Agent):
         self.bdi_enabled = True
 
     def add_behaviour(self, behaviour, template=None):
-        if type(behaviour) == self.BDIBehaviour:
+        if isinstance(behaviour, self.BDIBehaviour):
             self.bdi = behaviour
         super().add_behaviour(behaviour, template)
 
@@ -228,6 +228,7 @@ class BDIAgent(Agent):
             else:
                 await asyncio.sleep(0.1)
 
+
         def add_goal(self, functor: str, *args):
             goal_type = asp.GoalType.achievement
             trigger = asp.Trigger.addition
@@ -237,7 +238,6 @@ class BDIAgent(Agent):
             goal = asp.Literal(functor, args)
 
             goal = asp.freeze(goal, intention.scope, {})
-
 
             tagged_goal = goal.with_annotation(asp.Literal("source", (asp.Literal("user_added"),)))
             self.agent.bdi_intention_buffer.append((trigger, goal_type, tagged_goal, intention))
