@@ -48,9 +48,9 @@ class BDIAgent(Agent):
 
     def set_asl(self, asl_file: str):
         self.asl_file = asl_file
-        self._load_asl()
+        self.load_asl()
 
-    def _load_asl(self):
+    def load_asl(self):
         self.pause_bdi()
         try:
             with open(self.asl_file) as source:
@@ -63,14 +63,14 @@ class BDIAgent(Agent):
             self.pause_bdi()
 
     def on_start(self):
-        self._load_asl()
+        self.load_asl()
 
     class BDIBehaviour(CyclicBehaviour):
         def __init__(self):
             super().__init__()
             self.add_actions()
             self.add_custom_actions()
-            self.agent._load_asl()
+            self.agent.load_asl()
 
 
         def add_actions(self):
