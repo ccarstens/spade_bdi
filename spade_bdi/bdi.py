@@ -27,16 +27,13 @@ class BDIAgent(Agent):
         while not self.loop:
             time.sleep(0.01)
 
-        template = Template(metadata={"performative": "BDI"})
-        self.add_behaviour(self.BDIBehaviour(), template)
-
         self.bdi_env = asp.runtime.Environment()
         if isinstance(actions, asp.Actions):
             self.bdi_actions = actions
         else:
             self.bdi_actions = asp.Actions(asp_action)
-        self.bdi.add_actions()
-        self._load_asl()
+
+        # self._load_asl()
 
     def pause_bdi(self):
         self.bdi_enabled = False
@@ -65,7 +62,17 @@ class BDIAgent(Agent):
             self.asl_file = None
             self.pause_bdi()
 
+    def on_start(self):
+        self._load_asl()
+
     class BDIBehaviour(CyclicBehaviour):
+        def __init__(self):
+            super().__init__()
+            self.add_actions()
+            self.add_custom_actions()
+            self.agent._load_asl()
+
+
         def add_actions(self):
             @self.agent.bdi_actions.add(".send", 3)
             def _send(agent, term, intention):
@@ -95,6 +102,10 @@ class BDIAgent(Agent):
             @self.agent.bdi_actions.add_function("literal_function", (asp.Literal,))
             def _literal_function(x):
                 return x
+
+        def add_custom_actions(self):
+            """Override this method for registering your own actions and functions"""
+            pass
 
         def set_belief(self, name: str, *args):
             """Set an agent's belief. If it already exists, updates it."""
