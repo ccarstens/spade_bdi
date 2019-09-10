@@ -142,7 +142,7 @@ class BDIAgent(Agent):
 
             trigger = asp.Trigger.addition
             goal_type = asp.GoalType.belief
-
+            args = prepare_datatypes_for_asl(args)
             literal = get_literal_from_functor_and_arguments(name, args, intention=intention, source=source)
 
             self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
@@ -241,7 +241,6 @@ class BDIAgent(Agent):
 
             goal_type = asp.GoalType.achievement
             trigger = asp.Trigger.addition
-            args2 = tuple(map(prepare_datatypes_for_asl, args))
             literal = get_literal_from_functor_and_arguments(functor, args, source=source)
 
             self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
@@ -283,8 +282,6 @@ def transform_message_to_literal(message: Message):
 
 
 def get_literal_from_functor_and_arguments(functor, arguments, intention=asp.runtime.Intention(), source=""):
-    print(arguments)
-    print(prepare_datatypes_for_asl(arguments))
     literal = asp.Literal(functor, arguments)
     literal = asp.freeze(literal, intention.scope, {})
     if source:
