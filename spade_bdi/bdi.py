@@ -12,6 +12,8 @@ from spade.agent import Agent
 from spade.template import Template
 from spade.message import Message
 
+import aioconsole
+
 PERCEPT_TAG = frozenset([asp.Literal("source", (asp.Literal("percept"),))])
 
 
@@ -79,6 +81,7 @@ class BDIAgent(Agent):
         def add_actions(self):
             @self.agent.bdi_actions.add(".send", 3)
             def _send(agent, term, intention):
+
                 receivers = asp.grounded(term.args[0], intention.scope)
                 if isinstance(receivers, str) or isinstance(receivers, asp.Literal):
                     receivers = (receivers,)
@@ -110,6 +113,7 @@ class BDIAgent(Agent):
             """Override this method for registering your own actions and functions"""
             pass
 
+        # TODO rewrite in add_belief
         def set_belief(self, name: str, *args):
             """Set an agent's belief. If it already exists, updates it."""
             new_args = ()
@@ -118,6 +122,7 @@ class BDIAgent(Agent):
                     new_args += (asp.Literal(x),)
                 else:
                     new_args += (x,)
+
             term = asp.Literal(name, tuple(new_args), PERCEPT_TAG)
             found = False
             for belief in list(self.agent.bdi_agent.beliefs[term.literal_group()]):
@@ -129,6 +134,19 @@ class BDIAgent(Agent):
             if not found:
                 self.agent.bdi_intention_buffer.append((asp.Trigger.addition, asp.GoalType.belief, term,
                                                         asp.runtime.Intention()))
+
+
+        def add_belief(self, name: str, *args, **kwargs):
+            """Adds additional belief literal, does not update existing ones"""
+
+            sanitized_args = tuple(map(prepare_datatypes_for_asl, args))
+            term = asp.Literal(name, sanitized_args, PERCEPT_TAG)
+            trigger = asp.Trigger.addition
+            goal_type = asp.GoalType.belief
+            intention = asp.runtime.Intention() if 'intention' not in kwargs else kwargs['intention']
+
+            self.agent.bdi_intention_buffer.append((trigger, goal_type, term, intention))
+
 
         def remove_belief(self, name: str, *args):
             """Remove an existing agent's belief."""
@@ -205,17 +223,21 @@ class BDIAgent(Agent):
                     elif ilf_type == "achieve":
                         goal_type = asp.GoalType.achievement
                         trigger = asp.Trigger.addition
+                        # todo give it a list of ilf-types that are considered known that can be overridden
+                    elif ilf_type == "getuserinput":
+                        await self.get_user_input(msg)
                     else:
                         raise asp.AslError("unknown illocutionary force: {}".format(ilf_type))
 
-                    intention = asp.runtime.Intention()
-                    functor, args = parse_literal(msg.body)
+                    if ilf_type != "getuserinput":
+                        intention = asp.runtime.Intention()
+                        functor, args = parse_literal(msg.body)
 
-                    message = asp.Literal(functor, args)
-                    message = asp.freeze(message, intention.scope, {})
+                        message = asp.Literal(functor, args)
+                        message = asp.freeze(message, intention.scope, {})
 
-                    tagged_message = message.with_annotation(asp.Literal("source", (asp.Literal(str(msg.sender)),)))
-                    self.agent.bdi_intention_buffer.append((trigger, goal_type, tagged_message, intention))
+                        tagged_message = message.with_annotation(asp.Literal("source", (asp.Literal(str(msg.sender)),)))
+                        self.agent.bdi_intention_buffer.append((trigger, goal_type, tagged_message, intention))
 
                 if self.agent.bdi_intention_buffer:
                     temp_intentions = deque(self.agent.bdi_intention_buffer)
@@ -228,6 +250,8 @@ class BDIAgent(Agent):
             else:
                 await asyncio.sleep(0.1)
 
+        async def get_user_input(self, message: Message):
+            pass
 
         def add_goal(self, functor: str, *args):
             goal_type = asp.GoalType.achievement
@@ -260,3 +284,10 @@ def parse_literal(msg):
     else:
         new_args = ''
     return functor, new_args
+
+# TODO rename in something more meaningful when I understand the scope of the method
+def prepare_datatypes_for_asl(argument):
+    if type(argument) == str:
+        return asp.Literal(argument)
+    else:
+        return argument
