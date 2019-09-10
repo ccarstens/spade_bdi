@@ -51,12 +51,12 @@ basic.py::
     a.bdi.set_belief("car", "blue", "big")
     a.bdi.print_beliefs()
 
-    print(a.bdi.get_belief("car"))
+    print(a.bdi.get_belief_by_functor("car"))
     a.bdi.print_beliefs()
-    
+
     a.bdi.remove_belief("car", 'blue', "big")
     a.bdi.print_beliefs()
-    
+
     print(a.bdi.get_beliefs())
     a.bdi.set_belief("car", 'yellow')
 
@@ -74,7 +74,7 @@ basic.asl::
         .custom_action(8);
         +truck(blue).
 
-    +car(Color) 
+    +car(Color)
      <- .print("The car is ",Color).
 
 

@@ -26,7 +26,7 @@ class CounterAgent(BDIAgent):
         async def run(self):
             if self.counter != self.agent.bdi.get_belief_value("counter")[0]:
                 self.counter = self.agent.bdi.get_belief_value("counter")[0]
-                print(self.agent.bdi.get_belief("counter"))
+                print(self.agent.bdi.get_belief_by_functor("counter"))
 
     class Behav2(PeriodicBehaviour):
         async def run(self):

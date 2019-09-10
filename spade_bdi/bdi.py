@@ -70,6 +70,7 @@ class BDIAgent(Agent):
     class BDIBehaviour(CyclicBehaviour):
         def __init__(self):
             super().__init__()
+            self.custom_ilf_types = []
 
         def setup(self):
             """should be called AFTER the behaviour was added to an agent
@@ -113,9 +114,9 @@ class BDIAgent(Agent):
             """Override this method for registering your own actions and functions"""
             pass
 
-        # TODO rewrite in add_belief
-        def set_belief(self, name: str, *args):
-            """Set an agent's belief. If it already exists, updates it."""
+        def set_singleton_belief(self, name: str, *args):
+            """Set an agent's belief. If it already exists, updates it. This method removes all existing
+                beliefs with the same functor and therefore only allows for one belief per functor"""
             new_args = ()
             for x in args:
                 if type(x) == str:
@@ -136,31 +137,27 @@ class BDIAgent(Agent):
                                                         asp.runtime.Intention()))
 
 
-        def add_belief(self, name: str, *args, **kwargs):
+        def add_belief(self, name: str, *args, intention=asp.runtime.Intention(), source="percept"):
             """Adds additional belief literal, does not update existing ones"""
 
-            sanitized_args = tuple(map(prepare_datatypes_for_asl, args))
-            term = asp.Literal(name, sanitized_args, PERCEPT_TAG)
             trigger = asp.Trigger.addition
             goal_type = asp.GoalType.belief
-            intention = asp.runtime.Intention() if 'intention' not in kwargs else kwargs['intention']
 
-            self.agent.bdi_intention_buffer.append((trigger, goal_type, term, intention))
+            literal = get_literal_from_functor_and_arguments(name, args, intention=intention, source=source)
+
+            self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
 
 
-        def remove_belief(self, name: str, *args):
+        def remove_belief(self, functor: str, *args, source="percept"):
             """Remove an existing agent's belief."""
-            new_args = ()
-            for x in args:
-                if type(x) == str:
-                    new_args += (asp.Literal(x),)
-                else:
-                    new_args += (x,)
-            term = asp.Literal(name, tuple(new_args), PERCEPT_TAG)
-            self.agent.bdi_intention_buffer.append((asp.Trigger.removal, asp.GoalType.belief, term,
-                                                    asp.runtime.Intention()))
 
-        def get_belief(self, key: str, source=False):
+            trigger = asp.Trigger.removal
+            goal_type = asp.GoalType.belief
+
+            literal = get_literal_from_functor_and_arguments(functor, args)
+            self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, asp.runtime.Intention()))
+
+        def get_belief_by_functor(self, key: str, source=False):
             """Get an agent's existing belief. The first belief matching
             <key> is returned. Keep <source> False to strip source."""
             key = str(key)
@@ -181,23 +178,21 @@ class BDIAgent(Agent):
         def get_belief_value(self, key: str):
             """Get an agent's existing value or values of the <key> belief. The first belief matching
             <key> is returned"""
-            belief = self.get_belief(key)
+            belief = self.get_belief_by_functor(key)
             if belief:
                 return tuple(belief.split('(')[1].split(')')[0].split(','))
             else:
                 return None
 
         def get_beliefs(self, source=False):
-            """Get agent's beliefs.Keep <source> False to strip source."""
-            belief_list = []
-            for beliefs in self.agent.bdi_agent.beliefs:
-                try:
-                    raw_belief = (str(list(self.agent.bdi_agent.beliefs[beliefs])[0]))
+            """get all beliefs of an agent"""
+            beliefs = []
+            for belief_arity, belief_values in self.agent.bdi_agent.beliefs.items():
+                for stored_belief in belief_values:
+                    raw_belief = str(stored_belief)
                     raw_belief = self._remove_source(raw_belief, source)
-                    belief_list.append(raw_belief)
-                except IndexError:
-                    pass
-            return belief_list
+                    beliefs.append(raw_belief)
+            return beliefs
 
         def print_beliefs(self, source=False):
             """Print agent's beliefs.Keep <source> False to strip source."""
@@ -215,29 +210,18 @@ class BDIAgent(Agent):
                     mdata = msg.metadata
                     ilf_type = mdata["ilf_type"]
                     if ilf_type == "tell":
-                        goal_type = asp.GoalType.belief
-                        trigger = asp.Trigger.addition
+                        functor, arguments = parse_literal(msg.body)
+                        self.add_belief(functor, *arguments, source=msg.sender)
                     elif ilf_type == "untell":
-                        goal_type = asp.GoalType.belief
-                        trigger = asp.Trigger.removal
+                        functor, arguments = parse_literal(msg.body)
+                        self.remove_belief(functor, arguments, source=msg.sender)
                     elif ilf_type == "achieve":
-                        goal_type = asp.GoalType.achievement
-                        trigger = asp.Trigger.addition
-                        # todo give it a list of ilf-types that are considered known that can be overridden
-                    elif ilf_type == "getuserinput":
-                        await self.get_user_input(msg)
+                        functor, arguments = parse_literal(msg.body)
+                        self.add_achievement_goal(functor, *arguments, source=msg.sender)
+                    elif ilf_type in self.custom_ilf_types:
+                        await self.handle_message_with_custom_ilf_type(msg)
                     else:
                         raise asp.AslError("unknown illocutionary force: {}".format(ilf_type))
-
-                    if ilf_type != "getuserinput":
-                        intention = asp.runtime.Intention()
-                        functor, args = parse_literal(msg.body)
-
-                        message = asp.Literal(functor, args)
-                        message = asp.freeze(message, intention.scope, {})
-
-                        tagged_message = message.with_annotation(asp.Literal("source", (asp.Literal(str(msg.sender)),)))
-                        self.agent.bdi_intention_buffer.append((trigger, goal_type, tagged_message, intention))
 
                 if self.agent.bdi_intention_buffer:
                     temp_intentions = deque(self.agent.bdi_intention_buffer)
@@ -250,21 +234,15 @@ class BDIAgent(Agent):
             else:
                 await asyncio.sleep(0.1)
 
-        async def get_user_input(self, message: Message):
+        async def handle_message_with_custom_ilf_type(self, message: Message):
             pass
 
-        def add_goal(self, functor: str, *args):
+        def add_achievement_goal(self, functor: str, *args, intention=asp.runtime.Intention(), source=""):
             goal_type = asp.GoalType.achievement
             trigger = asp.Trigger.addition
+            literal = get_literal_from_functor_and_arguments(functor, args, source=source)
 
-            intention = asp.runtime.Intention()
-
-            goal = asp.Literal(functor, args)
-
-            goal = asp.freeze(goal, intention.scope, {})
-
-            tagged_goal = goal.with_annotation(asp.Literal("source", (asp.Literal("user_added"),)))
-            self.agent.bdi_intention_buffer.append((trigger, goal_type, tagged_goal, intention))
+            self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
 
 
 def parse_literal(msg):
@@ -272,18 +250,29 @@ def parse_literal(msg):
     if "(" in msg:
         args = msg.split("(")[1]
         args = args.split(")")[0]
-        args = literal_eval(args)
+        args2 = []
+        try:
+
+            args2 = literal_eval(args)
+        except Exception as e:
+            print(e)
+            print(functor)
+            print(args)
+
+        print(functor)
+        print(args)
 
         def recursion(arg):
             if isinstance(arg, list):
                 return tuple(recursion(i) for i in arg)
             return arg
 
-        new_args = (recursion(args),)
+        new_args = (recursion(args2),)
 
     else:
         new_args = ''
     return functor, new_args
+
 
 # TODO rename in something more meaningful when I understand the scope of the method
 def prepare_datatypes_for_asl(argument):
@@ -291,3 +280,21 @@ def prepare_datatypes_for_asl(argument):
         return asp.Literal(argument)
     else:
         return argument
+
+
+def transform_message_to_literal(message: Message):
+    functor, arguments = parse_literal(message.body)
+    return get_literal_from_functor_and_arguments(functor, arguments, source=message.sender)
+
+
+def get_literal_from_functor_and_arguments(functor, arguments, intention=asp.runtime.Intention(), source=""):
+    sanitized = tuple(map(prepare_datatypes_for_asl, arguments))
+
+    literal = asp.Literal(functor, sanitized)
+    literal = asp.freeze(literal, intention.scope, {})
+    if source:
+        literal = literal.with_annotation(asp.Literal("source", (asp.Literal(str(source)),)))
+    return literal
+
+
+
