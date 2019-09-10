@@ -214,7 +214,7 @@ class BDIAgent(Agent):
                         self.add_belief(functor, *arguments, source=msg.sender)
                     elif ilf_type == "untell":
                         functor, arguments = parse_literal(msg.body)
-                        self.remove_belief(functor, arguments, source=msg.sender)
+                        self.remove_belief(functor, *arguments, source=msg.sender)
                     elif ilf_type == "achieve":
                         functor, arguments = parse_literal(msg.body)
                         self.add_achievement_goal(functor, *arguments, source=msg.sender)
@@ -238,8 +238,10 @@ class BDIAgent(Agent):
             pass
 
         def add_achievement_goal(self, functor: str, *args, intention=asp.runtime.Intention(), source=""):
+
             goal_type = asp.GoalType.achievement
             trigger = asp.Trigger.addition
+            args2 = tuple(map(prepare_datatypes_for_asl, args))
             literal = get_literal_from_functor_and_arguments(functor, args, source=source)
 
             self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
@@ -250,24 +252,14 @@ def parse_literal(msg):
     if "(" in msg:
         args = msg.split("(")[1]
         args = args.split(")")[0]
-        args2 = []
-        try:
-
-            args2 = literal_eval(args)
-        except Exception as e:
-            print(e)
-            print(functor)
-            print(args)
-
-        print(functor)
-        print(args)
+        args = literal_eval(args)
 
         def recursion(arg):
             if isinstance(arg, list):
                 return tuple(recursion(i) for i in arg)
             return arg
 
-        new_args = (recursion(args2),)
+        new_args = (recursion(args),)
 
     else:
         new_args = ''
