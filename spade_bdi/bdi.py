@@ -283,7 +283,8 @@ def transform_message_to_literal(message: Message):
 
 
 def get_literal_from_functor_and_arguments(functor, arguments, intention=asp.runtime.Intention(), source=""):
-
+    print(arguments)
+    print(prepare_datatypes_for_asl(arguments))
     literal = asp.Literal(functor, arguments)
     literal = asp.freeze(literal, intention.scope, {})
     if source:
