@@ -267,11 +267,14 @@ def parse_literal(msg):
 
 
 # TODO rename in something more meaningful when I understand the scope of the method
-def prepare_datatypes_for_asl(argument):
-    if type(argument) == str:
-        return asp.Literal(argument)
-    else:
-        return argument
+def prepare_datatypes_for_asl(arguments):
+    def prepare_single(argument):
+        if type(argument) == str:
+            return asp.Literal(argument)
+        else:
+            return argument
+    return tuple(map(prepare_single, arguments))
+
 
 
 def transform_message_to_literal(message: Message):
@@ -280,9 +283,8 @@ def transform_message_to_literal(message: Message):
 
 
 def get_literal_from_functor_and_arguments(functor, arguments, intention=asp.runtime.Intention(), source=""):
-    sanitized = tuple(map(prepare_datatypes_for_asl, arguments))
 
-    literal = asp.Literal(functor, sanitized)
+    literal = asp.Literal(functor, arguments)
     literal = asp.freeze(literal, intention.scope, {})
     if source:
         literal = literal.with_annotation(asp.Literal("source", (asp.Literal(str(source)),)))
