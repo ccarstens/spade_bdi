@@ -17,6 +17,7 @@ PERCEPT_TAG = frozenset([asp.Literal("source", (asp.Literal("percept"),))])
 
 class BDIAgent(Agent):
     def __init__(self, jid: str, password: str, asl: str, actions=None, *args, **kwargs):
+        print("ccarstens ccarstens")
         self.asl_file = asl
         self.bdi_enabled = False
         self.bdi_intention_buffer = deque()
