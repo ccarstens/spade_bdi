@@ -281,8 +281,12 @@ def transform_message_to_literal(message: Message):
     return get_literal_from_functor_and_arguments(functor, arguments, source=message.sender)
 
 
-def get_literal_from_functor_and_arguments(functor, arguments, intention=asp.runtime.Intention(), source=""):
-    literal = asp.Literal(functor, arguments)
+def get_literal_from_functor_and_arguments(functor, arguments=None, intention=asp.runtime.Intention(), source=""):
+    if arguments:
+        literal = asp.Literal(functor, arguments)
+    else:
+        literal = asp.Literal(functor)
+
     literal = asp.freeze(literal, intention.scope, {})
     if source:
         literal = literal.with_annotation(asp.Literal("source", (asp.Literal(str(source)),)))
