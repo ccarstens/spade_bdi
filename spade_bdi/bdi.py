@@ -142,7 +142,6 @@ class BDIAgent(Agent):
 
             trigger = asp.Trigger.addition
             goal_type = asp.GoalType.belief
-            args = prepare_datatypes_for_asl(args)
             literal = get_literal_from_functor_and_arguments(name, args, intention=intention, source=source)
 
             self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
@@ -210,13 +209,13 @@ class BDIAgent(Agent):
                     mdata = msg.metadata
                     ilf_type = mdata["ilf_type"]
                     if ilf_type == "tell":
-                        functor, arguments = parse_literal(msg.body)
+                        functor, arguments = parse_literal_beta(msg.body)
                         self.add_belief(functor, *arguments, source=msg.sender)
                     elif ilf_type == "untell":
-                        functor, arguments = parse_literal(msg.body)
+                        functor, arguments = parse_literal_beta(msg.body)
                         self.remove_belief(functor, *arguments, source=msg.sender)
                     elif ilf_type == "achieve":
-                        functor, arguments = parse_literal(msg.body)
+                        functor, arguments = parse_literal_beta(msg.body)
                         self.add_achievement_goal(functor, *arguments, source=msg.sender)
                     elif ilf_type in self.custom_ilf_types:
                         await self.handle_message_with_custom_ilf_type(msg)
@@ -246,6 +245,38 @@ class BDIAgent(Agent):
             self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
 
 
+def parse_literal_beta(msg):
+    # todo make recursive so it can parse more than one dimension of arguments
+    functor = msg.split("(")[0]
+    if "(" in msg:
+        args = msg.split("(")[1]
+        args = args.split(")")[0]
+
+        if "," in args: # multiple arguments
+            args = args.split(",")
+
+        def transform_single(argument):
+            argument = argument.strip()
+            if "\"" in argument:  # string that should remain a string, not a literal
+                return argument.strip("\"")
+            else:
+                if "." in argument:  # float
+                    argument = float(argument)
+                    return argument
+                else: # int
+                    try:
+                        argument = int(argument)
+                        return argument
+                    except ValueError:  # literal, not string, not float, not int
+                        return asp.Literal(argument)
+
+        new_args = tuple(transform_single(arg) for arg in args)
+
+    else:
+        new_args = ''
+    return functor, new_args
+
+
 def parse_literal(msg):
     functor = msg.split("(")[0]
     if "(" in msg:
@@ -263,17 +294,6 @@ def parse_literal(msg):
     else:
         new_args = ''
     return functor, new_args
-
-
-# TODO rename in something more meaningful when I understand the scope of the method
-def prepare_datatypes_for_asl(arguments):
-    def prepare_single(argument):
-        if type(argument) == str:
-            return asp.Literal(argument)
-        else:
-            return argument
-    return tuple(map(prepare_single, arguments))
-
 
 
 def transform_message_to_literal(message: Message):
