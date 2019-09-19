@@ -209,6 +209,7 @@ class BDIAgent(Agent):
                     mdata = msg.metadata
                     ilf_type = mdata["ilf_type"]
                     if ilf_type == "tell":
+                        print("\n\n\n" + msg.body)
                         functor, arguments = parse_literal_beta(msg.body)
                         self.add_belief(functor, *arguments, source=msg.sender)
                     elif ilf_type == "untell":
@@ -252,8 +253,7 @@ def parse_literal_beta(msg):
         args = msg.split("(")[1]
         args = args.split(")")[0]
 
-        if "," in args: # multiple arguments
-            args = args.split(",")
+        args = args.split(",") # multiple arguments
 
         def transform_single(argument):
             argument = argument.strip()
