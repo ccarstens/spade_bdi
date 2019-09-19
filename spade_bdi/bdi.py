@@ -146,6 +146,10 @@ class BDIAgent(Agent):
 
             self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
 
+        def add_belief_literal(self, literal: asp.Literal, intention=asp.runtime.Intention()):
+            trigger = asp.Trigger.addition
+            goal_type = asp.GoalType.belief
+            self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
 
         def remove_belief(self, functor: str, *args, source="percept"):
             """Remove an existing agent's belief."""
