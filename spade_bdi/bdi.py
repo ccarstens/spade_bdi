@@ -146,6 +146,10 @@ class BDIAgent(Agent):
 
             self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
 
+        def add_belief_literal(self, literal: asp.Literal, intention=asp.runtime.Intention()):
+            trigger = asp.Trigger.addition
+            goal_type = asp.GoalType.belief
+            self.agent.bdi_intention_buffer.append((trigger, goal_type, literal, intention))
 
         def remove_belief(self, functor: str, *args, source="percept"):
             """Remove an existing agent's belief."""
@@ -252,8 +256,7 @@ def parse_literal_beta(msg):
         args = msg.split("(")[1]
         args = args.split(")")[0]
 
-        if "," in args: # multiple arguments
-            args = args.split(",")
+        args = args.split(",") # multiple arguments
 
         def transform_single(argument):
             argument = argument.strip()
